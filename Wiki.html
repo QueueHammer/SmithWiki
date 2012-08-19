@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smith Wiki</title>
+
+    <!-- Link to Stylesheet -->
+    <link rel="stylesheet" type="text/css" href="./css/cssreset-min.css" />
+    <link rel="stylesheet" type="text/css" href="./css/cssbase-min.css" />
+    <link rel="stylesheet" type="text/css" href="./css/grid.css" />
+    
+    <!-- Link to JavaScript -->
+    <!-- Frameworks -->
+    <script type="text/javascript" src="./js/json2.js"></script>
+    <script type="text/javascript" src="./js/jquery-1.7.2.min.js"></script>
+    <script type="text/javascript" src="./js/underscore-min.js"></script>
+    <script type="text/javascript" src="./js/backbone-min.js"></script>
+    <script type="text/javascript" src="./js/mustache.js"></script>
+    <script type="text/javascript" src="./js/amplify.store.min.js"></script>
+
+    <!-- Markdown -->
+    <script type="text/javascript" src="./js/Markdown.Converter.js"></script>
+    <script type="text/javascript" src="./js/Markdown.Editor.js"></script>
+    <script type="text/javascript" src="./js/Markdown.Sanitizer.js"></script>
+
+    <!-- Page Scripts -->
+    <script type="text/javascript">
+        $(function () {
+            var container = $('.container_8');
+            var containerTemplate = container.html();
+            var pageName;
+            
+            amplify.store('menu', 'La La La');
+            amplify.store('^default', 'This is the default page');
+                        
+            var Body = Backbone.View.extend({
+                'initialize' : function(){
+                    this.render();
+                },
+                'render': function() {
+                    var data = {
+                        'menu':amplify.store('menu'),
+                        'title':pageName.replace('_', ' '),
+                        'content':amplify.store(pageName),
+                    };
+
+                    var what = Mustache.render(containerTemplate, data)
+                    $(this.el).html(what);
+                    return this;
+                }
+
+            });
+
+            var PageRouter = Backbone.Router.extend({
+                'routes': {
+                    'pages/:pageName' : 'ShowPage',
+                    'edit/:pageName' : 'EditPage',
+                    '*path' : 'Default'
+                },
+                'Default' : function (name) {
+                    pageName = '^default';
+                    var bodyView = new Body({el:container});
+                },
+                'ShowPage' : function (name) {
+                    pageName = name;
+                    var bodyView = new Body({el:container});
+                },
+                'EditPage' : function (name) {
+                    pageName = name;
+                    var bodyView = new Body({el:container});
+                },
+            });
+
+            var pRouter = new PageRouter();
+            Backbone.history.start();
+        });
+    </script>
+    <script type="text/template" id="page_template">
+        <div class="grid_1">
+            <div id="Menu" class="grid_1 alpha omega">{{menu}}</div>
+        </div>
+        <div class="grid_7">
+            <div id="Title" class="grid_5 alpha">{{title}}</div>
+            <div id="Options" class="grid_2">
+            </div>
+            <div id="Content" class="grid_7 alpha omega">{{content}}</div>
+        </div>
+    </script>
+    <script type="text/template" id="edit_template">
+        <label>Search</label>
+        <input type="text" id="search_input" />
+        <input type="button" id="search_button" value="Search" />
+    </script>
+    
+</head>
+<body>
+    <div class="container_8">
+        <div class="grid_1">
+            <div id="Menu" class="grid_1 alpha omega">{{menu}}</div>
+        </div>
+        <div class="grid_7">
+            <div id="Title" class="grid_5 alpha">{{title}}</div>
+            <div id="Options" class="grid_2">
+            </div>
+            <div id="Content" class="grid_7 alpha omega">{{content}}</div>
+        </div>
+    </div>
+<!-- 
+    <div class="container_8">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+                <div class="wmd-panel">
+            <div id="wmd-button-bar"></div>
+            <textarea class="wmd-input" id="wmd-input">
+This is the *first* editor.
+------------------------------
+
+Just plain **Markdown**, except that the input is sanitized:
+
+<marquee>I'm the ghost from the past!</marquee>
+</textarea>
+        </div>
+        <div id="wmd-preview" class="wmd-panel wmd-preview"></div>
+    </div>-->
+</body>
+</html>
