@@ -7,6 +7,7 @@
     <link rel="stylesheet" type="text/css" href="./css/cssreset-min.css" />
     <link rel="stylesheet" type="text/css" href="./css/cssbase-min.css" />
     <link rel="stylesheet" type="text/css" href="./css/grid.css" />
+    <link rel="stylesheet" type="text/css" href="./css/page.css" />
     
     <!-- Link to JavaScript -->
     <!-- Frameworks -->
@@ -25,49 +26,125 @@
     <!-- Page Scripts -->
     <script type="text/javascript">
         $(function () {
-            var container = $('.container_8');
-            var containerTemplate = container.html();
-            var pageName;
-            
-            amplify.store('menu', 'La La La');
-            amplify.store('^default', 'This is the default page');
-                        
-            var Body = Backbone.View.extend({
-                'initialize' : function(){
-                    this.render();
-                },
-                'render': function() {
-                    var data = {
-                        'menu':amplify.store('menu'),
-                        'title':pageName.replace('_', ' '),
-                        'content':amplify.store(pageName),
-                    };
+            var pdConvert = Markdown.getSanitizingConverter();
+            pdConvert.hooks.chain('postConversion', function (text) {
+                var newText = text;
+                var pageLink = /\|(\w+)\|/g;
+                if (!pageLink.test(text)) return text;
+                text.match(pageLink).forEach(function (pageName) {
+                    pageLink.lastIndex = 0; //Who knew the regex index ever had to be reset?
+                    newText = newText.replace(pageName, '<span class="page_link">' + pageLink.exec(pageName)[1] + '</span>');
+                });
+                return newText;
+            });
 
-                    var what = Mustache.render(containerTemplate, data)
+            var pdEdit = new Markdown.Editor(pdConvert);
+            var mainContent = $('.container_8');
+
+            var PageView = Backbone.View.extend({
+                'initialize': function (params) {
+                    this.render(params['name']);
+                },
+                'render': function (pageName) {
+                    //create a list of all the keys in the page
+                    var pageNameRegex = /\{\{(\w+)\}\}/g;
+                    var pageTemplate = $('#page_template').html();
+                    var returnedKeys = pageTemplate.match(pageNameRegex);
+                    var pageNames = returnedKeys.map(function (n) {
+                        return pageNameRegex.exec(n)[1];
+                    });
+
+                    var pageKeys = pageNames.reduce(function (hash, name) {
+                        var storeVal = amplify.store(name);
+                        hash[name] = storeVal && storeVal.content ?
+                            pdConvert.makeHtml(storeVal.content) :
+                            'No page exists for <span class="page_link">' + name + '</span>';
+                        return hash;
+                    }, {});
+
+
+                    var storedPage = amplify.store(pageName);
+                    pageKeys['page'] =
+                        storedPage && storedPage.content ?
+                        storedPage :
+                        {
+                            'time': Date(),
+                            'title': pageName,
+                            'content': 'Press Edit to add content to this page.'
+                        };
+
+                    pageKeys['page'].content = pdConvert.makeHtml(pageKeys['page'].content);
+
+                    var what = Mustache.render($('#page_template').html(), pageKeys)
                     $(this.el).html(what);
                     return this;
+                },
+                'events': {
+                    'click .page_link': 'GoToPage',
+                    'click .edit_page': 'EditThisPage'
+                },
+                'GoToPage': function (e) {
+                    pRouter.navigate("pages/" + $(e.currentTarget).html(), true);
+                },
+                'EditThisPage': function (e) {
+                    var pageName = Backbone.history.fragment != "" ?
+                        Backbone.history.fragment.match(/\/(\w+)/)[1] :
+                        'main';
+                    pRouter.navigate("edit/" + pageName, true);
                 }
+            });
 
+            var EditView = Backbone.View.extend({
+                'initialize': function (params) {
+                    this.render(params['name']);
+                },
+                'render': function (pageName) {
+                    var storedPage = amplify.store(pageName);
+                    var pageKeys = {
+                        'title': pageName,
+                        'markdown': storedPage ? storedPage.content : ''
+                    };
+                    var what = Mustache.render($('#edit_template').html(), pageKeys)
+                    $(this.el).html(what);
+                    return this;
+                },
+                'events': {
+                    'click .save_page': 'SaveThisPage',
+                    'click .cancel_edit': 'CancelEdit'
+                },
+                'SaveThisPage': function (e) {
+                    var pageName = Backbone.history.fragment.match(/\/(\w+)/)[1];
+
+                    amplify.store(pageName, {
+                        'time': Date(),
+                        'title': pageName,
+                        'content': this.$('#wmd-input').val()
+                    });
+                    pRouter.navigate("pages/" + pageName, true);
+                },
+                'CancelEdit': function (e) {
+                    var pageName = Backbone.history.fragment.match(/\/(\w+)/)[1];
+                    pRouter.navigate("pages/" + pageName, true);
+                }
             });
 
             var PageRouter = Backbone.Router.extend({
                 'routes': {
-                    'pages/:pageName' : 'ShowPage',
-                    'edit/:pageName' : 'EditPage',
-                    '*path' : 'Default'
+                    'pages/:pageName': 'ShowPage',
+                    'edit/:pageName': 'EditPage',
+                    '*path': 'Default'
                 },
-                'Default' : function (name) {
-                    pageName = '^default';
-                    var bodyView = new Body({el:container});
+                'Default': function (name) {
+                    var pageName = 'main'; //###Use Filename without extention
+                    var page = new PageView({ el: mainContent, 'name': pageName });
                 },
-                'ShowPage' : function (name) {
-                    pageName = name;
-                    var bodyView = new Body({el:container});
+                'ShowPage': function (name) {
+                    var page = new PageView({ el: mainContent, 'name': name });
                 },
-                'EditPage' : function (name) {
-                    pageName = name;
-                    var bodyView = new Body({el:container});
-                },
+                'EditPage': function (name) {
+                    var page = new EditView({ el: mainContent, 'name': name });
+                    pdEdit.run();
+                }
             });
 
             var pRouter = new PageRouter();
@@ -76,53 +153,37 @@
     </script>
     <script type="text/template" id="page_template">
         <div class="grid_1">
-            <div id="Menu" class="grid_1 alpha omega">{{menu}}</div>
+            <div id="Menu" class="grid_1 alpha omega">{{{menu}}}</div>
         </div>
         <div class="grid_7">
-            <div id="Title" class="grid_5 alpha">{{title}}</div>
-            <div id="Options" class="grid_2">
-            </div>
-            <div id="Content" class="grid_7 alpha omega">{{content}}</div>
+            <div id="Title" class="grid_5 alpha">{{page.title}}</div>
+            <div id="" class="grid_1">{{page.time}}</div>
+            <div id="" class="grid_1 omega edit_page">Edit</div>
+            <div id="Content" class="grid_7 alpha omega">{{{page.content}}}</div>
         </div>
     </script>
     <script type="text/template" id="edit_template">
-        <label>Search</label>
-        <input type="text" id="search_input" />
-        <input type="button" id="search_button" value="Search" />
+        <div class="grid_6 title">{{title}}</div>
+        <div class="grid_1 save_page">Save</div>
+        <div class="grid_1 cancel_edit">Cancel</div>
+        <div class="wmd-panel grid_8">
+            <textarea class="wmd-input edit_box" id="wmd-input">{{markdown}}</textarea>
+        </div>
+        <div id="wmd-preview" class="wmd-panel wmd-preview grid_8"></div>
     </script>
     
 </head>
 <body>
     <div class="container_8">
-        <div class="grid_1">
-            <div id="Menu" class="grid_1 alpha omega">{{menu}}</div>
-        </div>
-        <div class="grid_7">
-            <div id="Title" class="grid_5 alpha">{{title}}</div>
-            <div id="Options" class="grid_2">
-            </div>
-            <div id="Content" class="grid_7 alpha omega">{{content}}</div>
-        </div>
     </div>
-<!-- 
-    <div class="container_8">
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-                <div class="wmd-panel">
-            <div id="wmd-button-bar"></div>
-            <textarea class="wmd-input" id="wmd-input">
-This is the *first* editor.
-------------------------------
-
-Just plain **Markdown**, except that the input is sanitized:
-
-<marquee>I'm the ghost from the past!</marquee>
-</textarea>
+    <!--
+        <div class="grid_6 title"></div>
+        <div class="grid_1 save"></div>
+        <div class="grid_1 cancel"></div>
+        <div class="wmd-panel grid_8">
+            <textarea class="wmd-input edit_box" id="wmd-input">
+            </textarea>
         </div>
-        <div id="wmd-preview" class="wmd-panel wmd-preview"></div>
-    </div>-->
+        <div id="wmd-preview" class="wmd-panel wmd-preview grid_8"></div>-->
 </body>
 </html>
