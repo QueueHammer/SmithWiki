@@ -26,7 +26,23 @@
     <!-- Page Scripts -->
     <script type="text/javascript">
         $(function () {
+            //Add in a string helper to make date formatting acceptable
+            String.prototype.format = function () {
+                var formatted = this;
+                for (var i = 0; i < arguments.length; i++) {
+                    formatted = formatted.replace(RegExp("\\{" + i + "\\}", 'g'), arguments[i]);
+                }
+                return formatted;
+            };
+
+            function GetDateNow() {
+                var now = new Date();
+                return "{0}/{1}/{2}".format(now.getDate(), now.getMonth()+1, now.getFullYear());
+            }
+
+            //Create the markdown renderer
             var pdConvert = Markdown.getSanitizingConverter();
+            //Now extend it to parse our keys for the links to new pages
             pdConvert.hooks.chain('postConversion', function (text) {
                 var newText = text;
                 var pageLink = /\|(\w+)\|/g;
@@ -38,22 +54,31 @@
                 return newText;
             });
 
+            //Finally create the editor object that will allow updates to pages
             var pdEdit = new Markdown.Editor(pdConvert);
+
+            //Create a variable for the main container
             var mainContent = $('.container_8');
 
+            //The page view is the main view of the app
+            //This is where the page template is parsed and filled with any additional pages that it needs
+            //Lastly it loads the content for the page that the user happens to be on
             var PageView = Backbone.View.extend({
                 'initialize': function (params) {
+                    //Call render with the page name
                     this.render(params['name']);
                 },
                 'render': function (pageName) {
-                    //create a list of all the keys in the page
+                    //create a list of all the keys in the page template
                     var pageNameRegex = /\{\{(\w+)\}\}/g;
                     var pageTemplate = $('#page_template').html();
                     var returnedKeys = pageTemplate.match(pageNameRegex);
+                    //Clean them up a little. From {{Name}} to Name
                     var pageNames = returnedKeys.map(function (n) {
                         return pageNameRegex.exec(n)[1];
                     });
 
+                    //Create a dictionary to fill in all the place holders with content if it exists
                     var pageKeys = pageNames.reduce(function (hash, name) {
                         var storeVal = amplify.store(name);
                         hash[name] = storeVal && storeVal.content ?
@@ -62,13 +87,13 @@
                         return hash;
                     }, {});
 
-
+                    //Now render the main page
                     var storedPage = amplify.store(pageName);
                     pageKeys['page'] =
                         storedPage && storedPage.content ?
                         storedPage :
                         {
-                            'time': Date(),
+                            'time': GetDateNow(),
                             'title': pageName,
                             'content': 'Press Edit to add content to this page.'
                         };
@@ -116,7 +141,7 @@
                     var pageName = Backbone.history.fragment.match(/\/(\w+)/)[1];
 
                     amplify.store(pageName, {
-                        'time': Date(),
+                        'time': GetDateNow(),
                         'title': pageName,
                         'content': this.$('#wmd-input').val()
                     });
