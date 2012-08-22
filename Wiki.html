@@ -7,6 +7,7 @@
     <link rel="stylesheet" type="text/css" href="./css/cssreset-min.css" />
     <link rel="stylesheet" type="text/css" href="./css/cssbase-min.css" />
     <link rel="stylesheet" type="text/css" href="./css/grid.css" />
+    <link rel="stylesheet" type="text/css" href="./css/pagedown.css" />
     <link rel="stylesheet" type="text/css" href="./css/page.css" />
     
     <!-- Link to JavaScript -->
@@ -37,7 +38,7 @@
 
             function GetDateNow() {
                 var now = new Date();
-                return "{0}/{1}/{2}".format(now.getDate(), now.getMonth()+1, now.getFullYear());
+                return "{0}/{1}/{2}".format(now.getDate(), now.getMonth() + 1, now.getFullYear());
             }
 
             //Create the markdown renderer
@@ -54,8 +55,6 @@
                 return newText;
             });
 
-            //Finally create the editor object that will allow updates to pages
-            var pdEdit = new Markdown.Editor(pdConvert);
 
             //Create a variable for the main container
             var mainContent = $('.container_8');
@@ -106,7 +105,8 @@
                 },
                 'events': {
                     'click .page_link': 'GoToPage',
-                    'click .edit_page': 'EditThisPage'
+                    'click .edit_page': 'EditThisPage',
+                    'click .home': 'GoHome'
                 },
                 'GoToPage': function (e) {
                     pRouter.navigate("pages/" + $(e.currentTarget).html(), true);
@@ -116,6 +116,9 @@
                         Backbone.history.fragment.match(/\/(\w+)/)[1] :
                         'main';
                     pRouter.navigate("edit/" + pageName, true);
+                },
+                'GoHome': function () {
+                    pRouter.navigate("/", true);
                 }
             });
 
@@ -125,12 +128,17 @@
                 },
                 'render': function (pageName) {
                     var storedPage = amplify.store(pageName);
+                    console.log('Loading data for edit: ' + pageName);
+                    console.log(storedPage);
                     var pageKeys = {
                         'title': pageName,
                         'markdown': storedPage ? storedPage.content : ''
                     };
                     var what = Mustache.render($('#edit_template').html(), pageKeys)
                     $(this.el).html(what);
+                    //Bind the editor and preview
+                    var pdEdit = new Markdown.Editor(pdConvert);
+                    pdEdit.run();
                     return this;
                 },
                 'events': {
@@ -139,17 +147,28 @@
                 },
                 'SaveThisPage': function (e) {
                     var pageName = Backbone.history.fragment.match(/\/(\w+)/)[1];
-
-                    amplify.store(pageName, {
+                    var whatGoesIn = {
                         'time': GetDateNow(),
                         'title': pageName,
                         'content': this.$('#wmd-input').val()
-                    });
+                    };
+
+                    console.log('Saving data for ' + pageName);
+                    console.log(whatGoesIn);
+                    amplify.store(pageName, whatGoesIn);
+
+                    console.log('What was saved for' + pageName);
+                    console.log(amplify.store(pageName));
+
                     pRouter.navigate("pages/" + pageName, true);
+                    this.remove();
+                    this.unbind();
                 },
                 'CancelEdit': function (e) {
                     var pageName = Backbone.history.fragment.match(/\/(\w+)/)[1];
                     pRouter.navigate("pages/" + pageName, true);
+                    this.remove();
+                    this.unbind();
                 }
             });
 
@@ -165,10 +184,13 @@
                 },
                 'ShowPage': function (name) {
                     var page = new PageView({ el: mainContent, 'name': name });
+                    this.remove();
+                    this.unbind();
                 },
                 'EditPage': function (name) {
                     var page = new EditView({ el: mainContent, 'name': name });
-                    pdEdit.run();
+                    this.remove();
+                    this.unbind();
                 }
             });
 
@@ -178,6 +200,7 @@
     </script>
     <script type="text/template" id="page_template">
         <div class="grid_1">
+            <div class="grid_1 alpha omega home">Home</div>
             <div id="Menu" class="grid_1 alpha omega">{{{menu}}}</div>
         </div>
         <div class="grid_7">
@@ -192,6 +215,7 @@
         <div class="grid_1 save_page">Save</div>
         <div class="grid_1 cancel_edit">Cancel</div>
         <div class="wmd-panel grid_8">
+            <div id="wmd-button-bar"></div>
             <textarea class="wmd-input edit_box" id="wmd-input">{{markdown}}</textarea>
         </div>
         <div id="wmd-preview" class="wmd-panel wmd-preview grid_8"></div>
