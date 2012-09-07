@@ -27,6 +27,9 @@
     <!-- Page Scripts -->
     <script type="text/javascript">
         $(function () {
+            /* Helper functions
+            */
+        
             //Add in a string helper to make date formatting acceptable
             String.prototype.format = function () {
                 var formatted = this;
@@ -36,14 +39,18 @@
                 return formatted;
             };
 
+            //Shortcut for data formatting
             function GetDateNow() {
                 var now = new Date();
                 return "{0}/{1}/{2}".format(now.getDate(), now.getMonth() + 1, now.getFullYear());
             }
 
+            /*  Make the Pagedown magic happen
+            */
+            
             //Create the markdown renderer
             var pdConvert = Markdown.getSanitizingConverter();
-            //Now extend it to parse our keys for the links to new pages
+            //Now extend it to parse our keys to provide links to other pages
             pdConvert.hooks.chain('postConversion', function (text) {
                 var newText = text;
                 var pageLink = /\|(\w+)\|/g;
@@ -55,7 +62,9 @@
                 return newText;
             });
 
-
+            /* Start builing our views
+            */
+            
             //Create a variable for the main container
             var mainContent = $('.container_8');
 
@@ -122,6 +131,8 @@
                 }
             });
 
+            //The Edit view is used to update the content of the pages
+            //This will take the markdown for the page and allow the user to edit, save or cancel
             var EditView = Backbone.View.extend({
                 'initialize': function (params) {
                     this.render(params['name']);
@@ -172,6 +183,8 @@
                 }
             });
 
+            /* Routing
+            */
             var PageRouter = Backbone.Router.extend({
                 'routes': {
                     'pages/:pageName': 'ShowPage',
@@ -184,7 +197,7 @@
                 },
                 'ShowPage': function (name) {
                     var page = new PageView({ el: mainContent, 'name': name });
-                    this.remove();
+                    this.remove(); //###Do this in one place, here or in the events in the view
                     this.unbind();
                 },
                 'EditPage': function (name) {
