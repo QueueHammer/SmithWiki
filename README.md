@@ -5,7 +5,7 @@ A JavaScript based Wiki. Built using jQuery, Underscore, Backbone, Mustache, and
 ---
 
 In the past I had used javascript wiki called TiddlyWiki. However modern browsers add restrictions to local file modification, disabling any permanent changes to TiddlyWiki.
-Looking at the idea of making my own I realised that a number of frameworks had been created to make developing such an app easier.
+Looking at the idea of making my own I realized that a number of frameworks had been created to make developing such an app easier.
 Specifically jQuery to clean up working with the DOM, Backbone for managing Views / Local Routes, Mustache for templating, and Amplify for persistent storage.
 
 ---
