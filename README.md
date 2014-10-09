@@ -1,6 +1,6 @@
 #SmithWiki#
 
-A JavaScript based Wiki. Built using jQuery, Underscore, Backbone, Mustache, and Amplify.
+A JavaScript based Wiki. Built using jQuery, Underscore, Backbone, Mustache, Showdown, and Amplify.
 
 ---
 
